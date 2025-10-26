@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useTheme } from 'next-themes';
 import {
   MapPin,
   Volume2,
@@ -25,7 +26,9 @@ import {
   Wallet,
   Home,
   PieChart,
-  Activity
+  Activity,
+  Moon,
+  Sun
 } from 'lucide-react';
 import {
   BarChart,
@@ -153,6 +156,8 @@ const MetricCard: React.FC<MetricCardProps> = ({
 };
 
 export default function MGNREGAPortal() {
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const [language, setLanguage] = useState<'en' | 'hi'>('en');
   const [districts, setDistricts] = useState<District[]>([]);
   const [selectedDistrict, setSelectedDistrict] = useState<string>('');
@@ -162,13 +167,16 @@ export default function MGNREGAPortal() {
   const [geoLoading, setGeoLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<PerformanceData | null>(null);
+  const [historicalData, setHistoricalData] = useState<PerformanceData[]>([]);
+  const [historicalLoading, setHistoricalLoading] = useState(false);
 
   // Available financial years with best data coverage
-  const availableYears = [
-  '2023-2024',
-  '2022-2023',
-  '2021-2022'];
+  const availableYears = ['2023-2024', '2022-2023', '2021-2022'];
 
+  // Set mounted state for theme
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const translations = {
     en: {
@@ -211,7 +219,15 @@ export default function MGNREGAPortal() {
       budgetAnalysis: 'Budget Analysis',
       utilizationRate: 'Utilization Rate',
       keyIndicators: 'Key Indicators Chart',
-      districtComparison: 'District vs State Average'
+      districtComparison: 'District vs State Average',
+      historicalComparison: 'Historical Performance Comparison',
+      historicalSubtitle: 'District performance across financial years',
+      works: 'Works',
+      households2: 'Households',
+      wageRate2: 'Wage Rate',
+      empDays: 'Emp Days',
+      expenditure: 'Expenditure (Cr)',
+      budgetUtil: 'Budget %'
     },
     hi: {
       title: 'मनरेगा सूचना पोर्टल',
@@ -253,7 +269,15 @@ export default function MGNREGAPortal() {
       budgetAnalysis: 'बजट विश्लेषण',
       utilizationRate: 'उपयोग दर',
       keyIndicators: 'मुख्य संकेतक चार्ट',
-      districtComparison: 'जिला बनाम राज्य औसत'
+      districtComparison: 'जिला बनाम राज्य औसत',
+      historicalComparison: 'ऐतिहासिक प्रदर्शन तुलना',
+      historicalSubtitle: 'वित्तीय वर्षों में जिला प्रदर्शन',
+      works: 'कार्य',
+      households2: 'परिवार',
+      wageRate2: 'मजदूरी दर',
+      empDays: 'रोजगार दिवस',
+      expenditure: 'व्यय (करोड़)',
+      budgetUtil: 'बजट %'
     }
   };
 
@@ -263,6 +287,13 @@ export default function MGNREGAPortal() {
   useEffect(() => {
     fetchDistricts();
   }, []);
+
+  // Fetch historical data when district changes
+  useEffect(() => {
+    if (selectedDistrict) {
+      fetchHistoricalData(selectedDistrict);
+    }
+  }, [selectedDistrict]);
 
   // Fetch districts from database API
   const fetchDistricts = async () => {
@@ -307,6 +338,26 @@ export default function MGNREGAPortal() {
       setError(t.fetchError);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Fetch historical data for all years
+  const fetchHistoricalData = async (districtCode: string) => {
+    setHistoricalLoading(true);
+    try {
+      const promises = availableYears.map(year =>
+        fetch(`/api/performance/${encodeURIComponent(districtCode)}/${encodeURIComponent(year)}`)
+          .then(res => res.ok ? res.json() : null)
+          .catch(() => null)
+      );
+      
+      const results = await Promise.all(promises);
+      const validData = results.filter((d): d is PerformanceData => d !== null);
+      setHistoricalData(validData);
+    } catch (err) {
+      console.error('Error fetching historical data:', err);
+    } finally {
+      setHistoricalLoading(false);
     }
   };
 
@@ -415,13 +466,24 @@ export default function MGNREGAPortal() {
               <h1 className="text-3xl sm:text-4xl font-bold mb-1 drop-shadow-lg">{t.title}</h1>
               <p className="text-sm text-blue-100 font-medium">{t.subtitle}</p>
             </div>
-            <Button
-              onClick={() => setLanguage(language === 'en' ? 'hi' : 'en')}
-              variant="secondary"
-              className="flex items-center gap-2 bg-white/90 hover:bg-white text-blue-700 font-semibold shadow-lg">
-              <Languages className="h-4 w-4" />
-              {language === 'en' ? 'हिंदी' : 'English'}
-            </Button>
+            <div className="flex gap-2">
+              {mounted && (
+                <Button
+                  onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                  variant="secondary"
+                  size="icon"
+                  className="bg-white/90 hover:bg-white text-blue-700 shadow-lg">
+                  {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+                </Button>
+              )}
+              <Button
+                onClick={() => setLanguage(language === 'en' ? 'hi' : 'en')}
+                variant="secondary"
+                className="flex items-center gap-2 bg-white/90 hover:bg-white text-blue-700 font-semibold shadow-lg">
+                <Languages className="h-4 w-4" />
+                {language === 'en' ? 'हिंदी' : 'English'}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -545,7 +607,6 @@ export default function MGNREGAPortal() {
         {!loading && data &&
         <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              {/* Active Works Card */}
               <MetricCard
               title="Active Works"
               titleHindi="सक्रिय कार्य"
@@ -561,8 +622,6 @@ export default function MGNREGAPortal() {
                 `सक्रिय कार्य: ${data.completedWorks}. ${data.activeWorkers} कार्यकर्ता लगे हुए हैं।`
               )} />
 
-
-              {/* Payment Status Card */}
               <MetricCard
               title="Payment Status"
               titleHindi="भुगतान स्थिति"
@@ -578,8 +637,6 @@ export default function MGNREGAPortal() {
                 `भुगतान स्थिति: औसत भुगतान ${data.avgPayment} रुपये है, ${data.paymentDelayed} दिन की औसत देरी के साथ।`
               )} />
 
-
-              {/* Monthly Trend Card */}
               <MetricCard
               title="Monthly Trend"
               titleHindi="मासिक रुझान"
@@ -597,8 +654,6 @@ export default function MGNREGAPortal() {
                 `मासिक रुझान: पिछली अवधि से ${(data.monthlyTrend || 0) > 0 ? 'बढ़ा' : 'घटा'} ${Math.abs(data.monthlyTrend || 0)} प्रतिशत।`
               )} />
 
-
-              {/* State Comparison Card */}
               <MetricCard
               title="State Comparison"
               titleHindi="राज्य तुलना"
@@ -615,12 +670,9 @@ export default function MGNREGAPortal() {
                 `State Comparison: Your district is ${(data.stateAverage || 0) > 0 ? 'above' : 'below'} state average by ${Math.abs(data.stateAverage || 0)} percent.` :
                 `राज्य तुलना: आपका जिला राज्य औसत से ${(data.stateAverage || 0) > 0 ? 'ऊपर' : 'नीचे'} ${Math.abs(data.stateAverage || 0)} प्रतिशत है।`
               )} />
-
             </div>
 
-            {/* Charts Section */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-              {/* Performance Metrics Bar Chart */}
               <Card className="p-6 shadow-xl border-2 border-primary/20 bg-gradient-to-br from-white to-blue-50/50 dark:from-gray-900 dark:to-blue-950/30">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-primary">
                   <BarChart3 className="h-5 w-5" />
@@ -670,7 +722,6 @@ export default function MGNREGAPortal() {
                 </ResponsiveContainer>
               </Card>
 
-              {/* Budget Utilization Radial Chart */}
               <Card className="p-6 shadow-xl border-2 border-primary/20 bg-gradient-to-br from-white to-indigo-50/50 dark:from-gray-900 dark:to-indigo-950/30">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-primary">
                   <PieChart className="h-5 w-5" />
@@ -719,7 +770,6 @@ export default function MGNREGAPortal() {
               </Card>
             </div>
 
-            {/* District Performance Details Section */}
             <Card className="p-6 mb-8 shadow-xl border-2 border-primary/20 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-blue-950 dark:to-indigo-950">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-bold flex items-center gap-2 text-primary">
@@ -742,7 +792,6 @@ export default function MGNREGAPortal() {
               </div>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* Approved Labour Budget */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-lg border-2 border-indigo-100 dark:border-indigo-900 hover:shadow-2xl hover:scale-105 transition-all duration-300">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="p-2 bg-gradient-to-br from-indigo-100 to-indigo-200 dark:from-indigo-900 dark:to-indigo-800 rounded-lg shadow-md">
@@ -755,7 +804,6 @@ export default function MGNREGAPortal() {
                   </div>
                 </div>
 
-                {/* Average Wage Rate */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-lg border-2 border-green-100 dark:border-green-900 hover:shadow-2xl hover:scale-105 transition-all duration-300">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="p-2 bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900 dark:to-green-800 rounded-lg shadow-md">
@@ -769,7 +817,6 @@ export default function MGNREGAPortal() {
                   </div>
                 </div>
 
-                {/* Average Employment Days */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-lg border-2 border-purple-100 dark:border-purple-900 hover:shadow-2xl hover:scale-105 transition-all duration-300">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="p-2 bg-gradient-to-br from-purple-100 to-purple-200 dark:from-purple-900 dark:to-purple-800 rounded-lg shadow-md">
@@ -783,7 +830,6 @@ export default function MGNREGAPortal() {
                   </div>
                 </div>
 
-                {/* Total Households Worked */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-lg border-2 border-blue-100 dark:border-blue-900 hover:shadow-2xl hover:scale-105 transition-all duration-300">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="p-2 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 rounded-lg shadow-md">
@@ -797,7 +843,6 @@ export default function MGNREGAPortal() {
                   </div>
                 </div>
 
-                {/* Women Person-Days */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-lg border-2 border-pink-100 dark:border-pink-900 hover:shadow-2xl hover:scale-105 transition-all duration-300">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="p-2 bg-gradient-to-br from-pink-100 to-pink-200 dark:from-pink-900 dark:to-pink-800 rounded-lg shadow-md">
@@ -811,7 +856,6 @@ export default function MGNREGAPortal() {
                   </div>
                 </div>
 
-                {/* Total Expenditure */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-lg border-2 border-orange-100 dark:border-orange-900 hover:shadow-2xl hover:scale-105 transition-all duration-300">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="p-2 bg-gradient-to-br from-orange-100 to-orange-200 dark:from-orange-900 dark:to-orange-800 rounded-lg shadow-md">
@@ -825,7 +869,6 @@ export default function MGNREGAPortal() {
                 </div>
               </div>
 
-              {/* Budget Utilization Progress Bar */}
               {data.approvedLabourBudget && data.approvedLabourBudget > 0 &&
             <div className="mt-6 pt-6 border-t-2 border-indigo-200 dark:border-indigo-800">
                   <div className="flex justify-between items-center mb-2">
@@ -850,6 +893,109 @@ export default function MGNREGAPortal() {
                 </div>
             }
             </Card>
+
+            {/* NEW: Historical Performance Comparison Chart */}
+            {historicalData.length > 0 && (
+              <Card className="p-6 mb-8 shadow-xl border-2 border-primary/20 bg-gradient-to-br from-white to-purple-50/50 dark:from-gray-900 dark:to-purple-950/30">
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h2 className="text-xl font-bold flex items-center gap-2 text-primary">
+                      <TrendingUp className="h-5 w-5" />
+                      {t.historicalComparison}
+                    </h2>
+                    <p className="text-sm text-muted-foreground mt-1">{t.historicalSubtitle}</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => speak(
+                      language === 'en' ?
+                        `Historical Performance Comparison across ${historicalData.length} years showing works completed, households benefited, wage rates, employment days, expenditure and budget utilization trends for ${getDistrictName(selectedDistrict)} district.` :
+                        `${getDistrictName(selectedDistrict)} जिले के लिए ${historicalData.length} वर्षों में ऐतिहासिक प्रदर्शन तुलना जिसमें पूर्ण कार्य, लाभार्थी परिवार, मजदूरी दर, रोजगार दिवस, व्यय और बजट उपयोग रुझान दिखाए गए हैं।`
+                    )}
+                    className="h-8 w-8 hover:bg-primary/10"
+                    aria-label={language === 'en' ? 'Read aloud' : 'सुनें'}>
+                    <Volume2 className="h-4 w-4" />
+                  </Button>
+                </div>
+                
+                <ResponsiveContainer width="100%" height={450}>
+                  <BarChart
+                    data={historicalData.map(item => ({
+                      year: item.finYear,
+                      [t.works]: item.completedWorks || 0,
+                      [t.households2]: Math.round((item.totalHouseholdsWorked || 0) / 100),
+                      [t.wageRate2]: item.avgWageRate || 0,
+                      [t.empDays]: item.avgDaysEmployment || 0,
+                      [t.expenditure]: Math.round((item.totalExpenditure || 0) / 10000000),
+                      [t.budgetUtil]: item.budgetUtilization || 0
+                    }))}
+                    margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" className="dark:opacity-20" />
+                    <XAxis 
+                      dataKey="year" 
+                      stroke="#6366f1" 
+                      style={{ fontSize: '12px', fontWeight: 600 }}
+                      angle={-15}
+                      textAnchor="end"
+                      height={60}
+                    />
+                    <YAxis 
+                      stroke="#6366f1" 
+                      style={{ fontSize: '11px' }}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                        border: '2px solid #6366f1',
+                        borderRadius: '12px',
+                        boxShadow: '0 8px 16px rgba(0,0,0,0.15)',
+                        padding: '12px'
+                      }}
+                      labelStyle={{ fontWeight: 'bold', marginBottom: '8px', color: '#4f46e5' }}
+                    />
+                    <Legend 
+                      wrapperStyle={{ paddingTop: '20px' }}
+                      iconType="circle"
+                    />
+                    <Bar dataKey={t.works} fill="#3b82f6" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey={t.households2} fill="#8b5cf6" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey={t.wageRate2} fill="#22c55e" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey={t.empDays} fill="#f59e0b" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey={t.expenditure} fill="#ec4899" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey={t.budgetUtil} fill="#06b6d4" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+                
+                <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                  <div className="flex items-center gap-2 p-2 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
+                    <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                    <span className="text-xs font-medium">{t.works}</span>
+                  </div>
+                  <div className="flex items-center gap-2 p-2 bg-purple-50 dark:bg-purple-950/30 rounded-lg">
+                    <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                    <span className="text-xs font-medium">{t.households2} (÷100)</span>
+                  </div>
+                  <div className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-950/30 rounded-lg">
+                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                    <span className="text-xs font-medium">{t.wageRate2}</span>
+                  </div>
+                  <div className="flex items-center gap-2 p-2 bg-amber-50 dark:bg-amber-950/30 rounded-lg">
+                    <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+                    <span className="text-xs font-medium">{t.empDays}</span>
+                  </div>
+                  <div className="flex items-center gap-2 p-2 bg-pink-50 dark:bg-pink-950/30 rounded-lg">
+                    <div className="w-3 h-3 rounded-full bg-pink-500"></div>
+                    <span className="text-xs font-medium">{t.expenditure}</span>
+                  </div>
+                  <div className="flex items-center gap-2 p-2 bg-cyan-50 dark:bg-cyan-950/30 rounded-lg">
+                    <div className="w-3 h-3 rounded-full bg-cyan-500"></div>
+                    <span className="text-xs font-medium">{t.budgetUtil}</span>
+                  </div>
+                </div>
+              </Card>
+            )}
           </>
         }
 
@@ -867,6 +1013,6 @@ export default function MGNREGAPortal() {
           </div>
         </Card>
       </div>
-    </div>);
-
+    </div>
+  );
 }
